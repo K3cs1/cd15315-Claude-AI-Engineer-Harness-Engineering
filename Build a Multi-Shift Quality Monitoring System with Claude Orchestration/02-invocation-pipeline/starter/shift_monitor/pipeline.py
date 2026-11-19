@@ -34,18 +34,13 @@ class ShiftResult:
 def gather_new_defects(
     warm: WarmStore, since_ts: str, limit: int = 50
 ) -> list[dict[str, Any]]:
-    # TODO: Return WarmStore.defects_since(since_ts, limit=limit) — nothing more.
-    # This must be a pure pass-through to SQL. No Python-side filtering of
-    # severity, component, or time. The test scans this function's source with
-    # AST and rejects any `if` / `filter` / `[x for x in ... if ...]` you add.
-    raise NotImplementedError
+    return warm.defects_since(since_ts, limit=limit)
 
 
 def build_rich_prompt(
     role: str, hot_state: HotState, new_defects: Sequence[Mapping[str, Any]]
 ) -> str:
-    # TODO: Build a rich invocation and return its rendered prompt string.
-    raise NotImplementedError
+    return rich(role, hot_state, new_defects).prompt
 
 
 def _parse_hot_state_update(response_text: str) -> dict[str, Any] | None:
@@ -97,20 +92,41 @@ def run_shift(
     since_ts: str,
     role: str = "quality engineer",
 ) -> ShiftResult:
-    # TODO: One shift = exactly one Claude call. Walk the pipeline end to end:
-    #
-    #   1. Read the prior HotState from hot_state_path.
-    #   2. Pull new defects via gather_new_defects (SQL side, no Python filter).
-    #   3. Build the rich prompt with build_rich_prompt(role, hot_state, new_defects).
-    #   4. Call client.complete([Message(role="user", content=prompt)]) exactly once.
-    #   5. Parse the response's JSON fence (use _parse_hot_state_update) for an
-    #      updated current_shift_summary, active_alerts, and threshold_statuses.
-    #      Fall back to the prior values when a field is missing.
-    #   6. Build the updated HotState (use _new_hashes for the hash list, then
-    #      _trim_to_budget to honor the 5_120-byte ceiling).
-    #   7. Write the updated HotState atomically to hot_state_path.
-    #   8. Append one ScratchpadEntry to scratchpad_path summarising this shift
-    #      (hypothesis_id=f"shift-{shift_id}", evidence + conclusion derived
-    #      from the response, ts=datetime.now(UTC)).
-    #   9. Return ShiftResult(shift_id, new_defect_count, summary).
-    raise NotImplementedError
+    prior = HotState.from_path(hot_state_path)
+    new_defects = gather_new_defects(warm, since_ts)
+    prompt = build_rich_prompt(role, prior, new_defects)
+    response = client.complete([Message(role="user", content=prompt)])
+    response_text = response.content
+
+    update = _parse_hot_state_update(response_text) or {}
+    summary = _short_summary_from_response(response_text, shift_id)
+    new_summary = update.get("current_shift_summary")
+    if not isinstance(new_summary, str) or not new_summary:
+        new_summary = summary
+    alerts = update.get("active_alerts")
+    if not isinstance(alerts, list):
+        alerts = prior.active_alerts
+    thresholds = update.get("threshold_statuses")
+    if not isinstance(thresholds, dict):
+        thresholds = prior.threshold_statuses
+
+    updated = HotState(
+        recent_defect_hashes=_new_hashes(new_defects, prior.recent_defect_hashes),
+        current_shift_summary=new_summary,
+        active_alerts=[str(a) for a in alerts],
+        threshold_statuses={str(k): str(v) for k, v in thresholds.items()},
+    )
+    updated = _trim_to_budget(updated)
+    updated.write_atomic(hot_state_path)
+
+    Scratchpad(scratchpad_path).append(
+        ScratchpadEntry(
+            hypothesis_id=f"shift-{shift_id}",
+            evidence=f"{len(new_defects)} new defects since {since_ts}",
+            conclusion=summary,
+            ts=datetime.now(UTC),
+        )
+    )
+    return ShiftResult(
+        shift_id=shift_id, new_defect_count=len(new_defects), summary=new_summary
+    )
