@@ -2,16 +2,7 @@
 
 Choosing between Claude Code's **plan mode** (investigate and propose before changing anything) and **direct execution** (change code immediately) is the single biggest leverage point in how the team uses the harness day-to-day. The wrong mode at either extreme costs us: plan mode for trivial fixes is friction; direct execution for architectural changes burns context and produces rework.
 
-<!--
-TODO: Replace this comment with a blockquote citation for the Knight-Webb
-      "SWE Is Becoming Plan and Review" anchor talk that frames this decision,
-      for example:
-
-        > Anchor talk: Knight-Webb, "SWE Is Becoming Plan and Review."
-
-      The validator checks that the citation names the speaker (Knight-Webb), the
-      talk title, and the words "anchor talk".
--->
+> *Anchor talk: Knight-Webb, "SWE Is Becoming Plan and Review." The framing for this decision: pick the mode by the shape of the work, not its size.*
 
 This doc walks four concrete decisions against our codebase: one plan-mode example, one direct-execution example, one Explore-subagent example, and one combined-workflow example.
 
@@ -19,100 +10,45 @@ This doc walks four concrete decisions against our codebase: one plan-mode examp
 
 ## 1. Plan-mode example
 
-<!--
-TODO: Write a plan-mode worked example against this codebase. Requirements:
+**Task:** extract a shared `useCart(userId)` hook from the three components that each duplicate the cart-fetching pattern: `src/components/Cart/Cart.tsx`, `src/components/Checkout/Checkout.tsx`, and `src/components/MiniCart/MiniCart.tsx`.
 
-  - Touch AT LEAST THREE real files in src/. A natural candidate is extracting a
-    shared `useCart(userId)` hook into src/hooks/ from three components that
-    currently duplicate the pattern:
-      - src/components/Cart/Cart.tsx
-      - src/components/Checkout/Checkout.tsx
-      - src/components/MiniCart/MiniCart.tsx
-    (All three exist in this repo — confirm before referencing.)
+**Why plan mode:** this hits every plan-mode criterion: a large-scale change, multiple valid approaches (a plain hook, a context provider, or a data-fetching library), an architectural decision (where cart state lives and who owns invalidation), and multi-file modification across three components plus a new hook module. The extraction target is a file that doesn't exist yet, so we name it in prose (a new hooks module for `useCart`) rather than by path.
 
-  - State the reasoning that uses the plan-mode criteria: large-scale changes,
-    multiple valid approaches, architectural decisions, multi-file modifications.
-
-  - EXPLICITLY cite "prevent costly rework" (or equivalent phrasing) as the value
-    of planning before committing. This is the Knight-Webb principle.
-
-  - File-path rule: if you mention a file in backticks, it must actually exist
-    in the repo. For hypothetical/future files (e.g. the extraction target that
-    doesn't exist yet), use PROSE form (no backticks) instead. Otherwise the
-    validator will flag a dangling reference.
--->
+Plan mode lets Claude read all three components, compare how each handles loading and error state, and propose one design for us to review before any file changes. Settling the hook's signature up front is what lets us prevent costly rework: if we discover after editing two components that the third needs a different return shape, we would redo the first two. This is the Knight-Webb principle: review the plan, not the diff.
 
 ---
 
 ## 2. Direct-execution example
 
-<!--
-TODO: Write a direct-execution worked example. Requirements:
+**Task:** reject negative quantities in the order handler, in `src/api/orders/handler.ts`, by adding a `min: 0` style check to the quantity validation (the schema lives in `src/api/_schemas/orders.ts`, but the edit is one check).
 
-  - Target a single, well-scoped change in ONE function. A natural candidate is
-    adding a `min: 0` validation to the quantity field in the orders schema or
-    handler:
-      - src/api/orders/handler.ts (or src/api/_schemas/orders.ts)
-    Confirm the file exists before referencing it.
+**Why direct execution:** this is a simple, well-scoped change: one function, one check, no design choices. We can describe it in one sentence and already predict the patch, so a planning round trip would cost more than the change itself.
 
-  - State the reasoning that uses the direct-execution criterion: simple,
-    well-scoped changes.
-
-  - Convey the bar for "direct execution": you (the author) already know what
-    the diff looks like before invoking Claude. If you can describe the change
-    in one sentence and predict the patch, skip planning.
--->
+**The bar:** if you, the author, know what the diff looks like before invoking Claude, skip planning. Ask for the change, read the diff, run the tests. If you catch yourself unsure which function or file is involved, you are not past the bar; switch to plan mode.
 
 ---
 
 ## 3. Explore-subagent example
 
-<!--
-TODO: Write an Explore-subagent worked example. Requirements:
+**Task:** find every place we call `processRefund` before we change its signature. Known candidates are `src/api/orders/refund.ts`, `src/api/billing/issue.ts`, and the definition in `src/services/payment.ts`.
 
-  - A real discovery task in this codebase. A natural candidate: "find every
-    place we call `processRefund`" — the answer touches src/api/orders/refund.ts,
-    src/api/billing/issue.ts, and src/services/payment.ts. Confirm the files
-    and the call sites exist before referencing them.
+**Why an Explore subagent:** discovery produces verbose output (grep hits, file excerpts, dead ends) that we will never need again once we have the answer. Delegating to an Explore subagent isolates verbose discovery output from the main conversation and returns only a summary, preserving main-session context for the actual change.
 
-  - State the reasoning that uses the Explore criterion: isolating verbose
-    discovery output and returning summaries to preserve main conversation context.
-
-  - REFERENCE THE SCRATCHPAD PATTERN. The Explore sub-agent
-    should write its working notes to a scratchpad file (e.g. tmp/refund-callsites.md)
-    so the inventory survives the main session's context window. Name it
-    explicitly — "scratchpad pattern" should appear in your text.
--->
+**Scratchpad pattern:** instruct the subagent to write its working notes to a scratchpad file such as `tmp/refund-callsites.md` (call site, caller function, argument shape). This scratchpad pattern means the inventory survives context compaction and can be re-read later by the main session or a fresh one, rather than living only in a chat summary.
 
 ---
 
 ## 4. Combined workflow — plan mode for investigation, then direct execution
 
-<!--
-TODO: Write a combined-workflow worked example. This is the most subtle of the
-      four — developers often see plan mode and direct execution as binary. The
-      combined workflow uses plan mode for the DISCOVERY part (where you don't
-      yet know the call-site list) and direct execution for the MECHANICAL part
-      (where the rename is keystrokes once the list is known).
+**Task:** rename `ordersRepo.findById` to `ordersRepo.getById` in `src/db/orders.ts` to follow the team convention (`get*` for single-row reads, `find*` for multi-row).
 
-      Requirements:
+**Why combine them:** the call-site list is unknown at the start. Static grep finds `src/api/orders/refund.ts` and `src/api/billing/issue.ts`, but dynamic lookups (method names built from strings) would be missed. That discovery is plan-mode work. Once the list is known, the rename is mechanical keystrokes, which is direct-execution work. This is combining plan mode for investigation with direct execution for implementation.
 
-      - A real change in this codebase where investigation should precede edits.
-        A natural anchor: renaming `ordersRepo.findById` → `ordersRepo.getById`
-        in src/db/orders.ts to align with a team naming convention
-        (get* for single-row reads, find* for multi-row). The investigation
-        question is "where is findById called, and are any of them dynamic
-        (constructed string lookups grep would miss)?" — plan mode handles that.
-        Once the call-site list is in hand, the rename itself is mechanical:
-        direct execution.
+**Flow:**
 
-      - State the reasoning: "Combining plan mode for investigation with
-        direct execution for implementation."
-
-      - Show the flow as a 3-step sequence: (1) plan mode investigates and
-        proposes; (2) you approve the plan; (3) direct execution applies the
-        rename and runs tests.
--->
+1. **Plan mode investigates and proposes.** Claude searches for every call site, flags any dynamic lookups grep can't see, and proposes the full edit list.
+2. **You approve the plan.** Check the list, especially the dynamic cases, and correct it if needed.
+3. **Direct execution applies the rename and runs the tests.** No more planning; make the edits, run the suite, and confirm nothing still references `findById`.
 
 ---
 
