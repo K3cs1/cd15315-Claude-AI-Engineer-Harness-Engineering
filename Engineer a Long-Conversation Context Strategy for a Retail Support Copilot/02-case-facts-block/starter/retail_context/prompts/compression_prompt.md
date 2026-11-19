@@ -1,24 +1,17 @@
-<!-- TODO (Exercise 3): Replace this file with the compression prompt.
+You compress ONE resolved customer-support segment into a dense summary that will sit in the middle of a larger context window. The segment is finished; a later reader needs its outcome and key facts, not its conversation.
 
-This file is the system message for the per-resolved-segment Claude call in
-`compressor.summarize_segment`. It is committed as a *template* so the
-intent is auditable: a reviewer reads this file to decide whether following it
-would reliably produce the required structure.
+Output exactly this structure and nothing else:
 
-Required structure of the model's output:
+**Outcome.** One sentence, past tense, naming what was resolved.
 
-  1. ONE sentence naming what was resolved (past-tense outcome).
-  2. 3-6 bullet facts: amounts, IDs, statuses, dates — preserved verbatim.
-  3. ONE sentence naming the resolution (the segment's terminal state).
+**Key facts.**
+- 3 to 6 bullets of concrete facts: amounts, IDs, statuses, dates.
 
-Rules to bake into the prompt:
+**Resolution.** One sentence naming the segment's terminal state.
 
-  - Total output ≤ 500 tokens. Tight is better than verbose.
-  - Preserve identifiers and amounts byte-exact (e.g., ORD-77310, $22.14 —
-    no "around $20", no "approximately").
-  - Preserve snake_case status tokens verbatim from the transcript.
-  - No prose around the structure — no preambles, no closing remarks, no
-    code fences in the output.
-
-The prompt is yours to write. The above is the contract the reviewer (and
-the eval pipeline) will check against. -->
+Rules:
+- Total output must be 500 tokens or fewer. Tight beats verbose.
+- Preserve identifiers and amounts byte-exact (e.g. ORD-77310, $22.14). Never round or hedge: no "around $20", no "approximately".
+- Preserve snake_case status tokens and uppercase codes verbatim as they appear in the transcript (e.g. cancelled_with_prorated_refund, AVS_MISMATCH).
+- Use only facts present in the segment. Do not invent or infer missing values.
+- No preamble, no closing remarks, no code fences, no text outside the structure above.

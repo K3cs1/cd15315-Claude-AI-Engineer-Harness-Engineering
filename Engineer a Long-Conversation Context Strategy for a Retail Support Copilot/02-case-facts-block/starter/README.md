@@ -13,34 +13,45 @@ The defining architectural choice is **application-side context engineering**: t
 
 ## Context-window anatomy
 
-<!-- TODO (Exercise 4): Replace this section with the five-layer context-window
-     anatomy diagram (system prompt → CLAUDE.md → memory → conversation history
-     → current turn) AND a one-paragraph note locating *this project's* work on
-     one specific layer. The diagram can be ASCII or Mermaid — the point is
-     that a reviewer can read a labeled box and find the corresponding section
-     of `runs/<id>/context.md`. -->
+```
+┌───────────────────────────────────────────────┐
+│ 1. System prompt                              │
+├───────────────────────────────────────────────┤
+│ 2. CLAUDE.md (project instructions)           │
+├───────────────────────────────────────────────┤
+│ 3. Memory                                     │
+├───────────────────────────────────────────────┤
+│ 4. Conversation history  ◄── THIS PROJECT     │
+│    ┌─────────────────────────────────────┐    │
+│    │ # Case Facts            (top)       │    │
+│    │ # Resolved: Refund inquiry   (mid)  │    │
+│    │ # Resolved: Subscription ... (mid)  │    │
+│    │ # Active issue: Payment-... (bottom)│    │
+│    └─────────────────────────────────────┘    │
+├───────────────────────────────────────────────┤
+│ 5. Current turn (new user message)            │
+└───────────────────────────────────────────────┘
+```
+
+This project operates on **Layer 4, conversation history**. The 48-turn transcript is rewritten into `runs/<id>/context.md`: the `# Case Facts` box is the top of that file, the two `# Resolved:` boxes are its middle, and the `# Active issue:` box is its bottom, directly above the new user turn (Layer 5).
 
 ## Why this layout?
 
-<!-- TODO (Exercise 4): Replace this section with 3-5 sentences naming WHY
-     case facts sit at the top, resolved summaries sit in the middle, and the
-     active segment sits verbatim at the bottom. Cite at minimum:
-       (a) the "lost in the middle" attention effect,
-       (b) the resolved-vs-active fidelity tradeoff, and
-       (c) the pass-complete-history baseline this project deliberately deviates
-           from (only for resolved threads, where coherence is no longer load-
-           bearing). The "scratchpad" synonym for the case-facts block is worth
-           naming. -->
+Models attend best to the start and end of a long context and worst to the middle (the "lost in the middle" effect), so the densest, most decision-critical content goes at the boundaries: the structured case-facts block (a "scratchpad") at the top and the active segment at the bottom, next to the new user turn. Resolved threads are no longer being negotiated, so their narrative is compressed into short summaries in the lower-attention middle, trading fidelity for tokens where coherence no longer matters. The active segment stays byte-exact because every turn of it can still change the answer. This deliberately deviates from the pass-complete-history baseline, and only for resolved threads.
 
 ## Before / after token budget
 
-<!-- TODO (Exercise 4): Replace this section with a one-line statement of the
-     token-counting methodology actually used (sourced from `tokens.methodology()`
-     and recorded in `budget.json`), followed by a Markdown table populated from
-     `runs/<id>/budget.json` showing per-section + assembled total + baseline +
-     reduction-percentage. The table is *sourced from* `budget.json`, not
-     narrated — anyone re-running the pipeline should regenerate the same table
-     (modulo a few percent of drift if the Anthropic endpoint is used). -->
+Token counting methodology is recorded in `runs/<id>/budget.json` under `token_counter_methodology` (sourced from `tokens.methodology()`). Regenerate this table from the latest `budget.json` after a `--all` run:
+
+| Section | Tokens |
+|---|---|
+| case_facts | _from budget.json_ |
+| resolved_refund | _from budget.json_ |
+| resolved_subscription | _from budget.json_ |
+| active | _from budget.json_ |
+| **assembled total** | _assembled_tokens_ |
+| **baseline (full transcript)** | _baseline_tokens_ |
+| **reduction** | _reduction_pct_ % |
 
 ## Eval results
 
