@@ -1,0 +1,1 @@
+{"hypothesis_id":"shift-C","evidence":"0 new defects since 2026-04-29T22:00:00Z","conclusion":"Capacitor-bank-C-7 produced 5 same-lot defects (3 high, 2 medium) in 4 hours, all traceable to lot 2026-0430-B and consistent with a dielectric degradation mode that should escalate the existing alert","ts":"2026-11-19T13:40:00.016984Z"}
