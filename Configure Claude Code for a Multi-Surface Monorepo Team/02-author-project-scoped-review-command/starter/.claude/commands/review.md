@@ -1,18 +1,17 @@
 ---
-# TODO: Write the YAML frontmatter for this command. It must include:
-#
-#   description:   one line, ≥10 characters, naming what the command does
-#   argument-hint: short description of how to pass a target (PR ref, diff range, or file path)
-#   allowed-tools: a list of READ-ORIENTED tools only — no Edit, Write, NotebookEdit, or
-#                  unrestricted Bash.
-#
-# Granular Bash sub-command allowlisting is the canonical pattern. For example:
-#   - Bash(git diff:*)
-#   - Bash(git log:*)
-#   - Bash(gh pr view:*)
-# This lets you allow READ operations on git without unlocking the full shell. The
-# command should be able to run `git diff`, `git log`, `gh pr view`, `gh pr checks`,
-# etc. — but NOT `git push`, `git commit`, or arbitrary `Bash(...)`.
+description: Review a pull request or diff against this repo's conventions and report categorized findings
+argument-hint: <PR number, PR URL, diff range like main...HEAD, or file path>
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git show:*)
+  - Bash(git status:*)
+  - Bash(gh pr view:*)
+  - Bash(gh pr diff:*)
+  - Bash(gh pr checks:*)
 ---
 
 # /review — team PR review
@@ -21,61 +20,43 @@ You are reviewing the diff identified by `$ARGUMENTS` against this repository's 
 
 ## Phase 1 — Interview pattern
 
-<!--
-TODO: Write the interview-pattern subsection. The reviewer agent should ask clarifying
-      questions BEFORE reporting findings whenever the author's intent is ambiguous.
+Ask clarifying questions BEFORE reporting findings whenever the author's intent is ambiguous. Without this step the reviewer commits to a confidently wrong verdict (e.g. "no test coverage" on a refactor whose behavior is already covered upstream) and the author has to argue it back. Ask first, then review with the answers.
 
-      Why this matters (and why it's not obvious on first read): without an interview
-      step, the reviewer commits to a confidently-wrong verdict on ambiguous changes —
-      e.g. a refactor that touched no test files. The author then has to argue against
-      a "no test coverage" finding when the behavior was already covered upstream. The
-      interview pattern asks first.
+Interview (ask 1-3 focused questions, then wait) when the diff shows any of these triggers:
 
-      Name at least three concrete trigger conditions where the reviewer should
-      interview rather than report. Suggested triggers:
-        - dependency changes (package.json or pyproject.toml diffs)
-        - public API response shape changes or DB column changes
-        - refactors with no corresponding test changes
-        - changes that touch multiple surfaces (API + components + DB) at once
--->
+- **Dependency changes** — `package.json` or `pyproject.toml` diffs: why is it added/bumped, and is a lighter or existing option unsuitable?
+- **Public API response shape or DB column changes** — is this backward compatible, and is there a migration/rollout plan for existing clients and data?
+- **Refactors with no test changes** — is existing coverage expected to catch regressions, and where does it live?
+- **Multi-surface changes** — API + components + DB touched at once: which surface is the source of truth, and can they ship independently?
+
+If none of these apply and intent is clear, skip the interview and go straight to Phase 2.
 
 ## Phase 2 — Review criteria
 
-<!--
-TODO: Write the explicit must-report vs. skip taxonomy. The point of explicit criteria
-      (vs vague "be thorough" instructions) is that two teammates running this command
-      on the same PR should reach the same verdict.
+**Must report** (these block approval):
 
-      Must report: at minimum, name categories for bugs (logic errors, missing await,
-      race conditions, off-by-one), security (raw SQL with user input, missing auth,
-      secrets in code, dangerouslySetInnerHTML), convention violations the path-scoped
-      rules catch, breaking changes, and migration safety.
+- **Bugs** — logic errors, missing `await`, race conditions, off-by-one errors, unhandled error paths.
+- **Security** — raw SQL built from user input, missing authentication/authorization, secrets in code, `dangerouslySetInnerHTML` with unsanitized data.
+- **Convention violations** caught by the path-scoped rules in `.claude/rules/` and `.claude/standards/` (e.g. returning `{ status: 404 }` instead of throwing `ApiError`, bypassing the repository layer).
+- **Breaking changes** — response shape changes without a schema update, removed or renamed public fields.
+- **Migration safety** — non-forward migrations, bad filename sequence, destructive changes without a plan, multi-statement writes outside `withTransaction`.
 
-      Skip: at minimum, name categories the reviewer should NOT block on — minor
-      formatting (Prettier handles it), naming bikeshed when the name is fine, personal
-      stylistic preferences not encoded in rules/standards, and TODOs that already have
-      tracked tickets.
+**Skip** (do not report; never block on these):
 
-      The skip list is what keeps false positives from destroying author trust.
--->
+- Minor formatting — Prettier handles it.
+- Naming bikeshedding when the existing name is clear and fine.
+- Personal stylistic preferences not encoded in rules or standards.
+- TODOs that already reference a tracked ticket.
+
+When unsure whether something is must-report, ask in the interview phase rather than guessing.
 
 ## Phase 3 — Bundling: interacting vs. independent findings
 
-<!--
-TODO: Write the bundling guidance. The contrast is hard to internalize without a
-      concrete pair of examples (which you'll write in the Examples section below).
+**Interacting findings** overlap or share a single fix. Bundle them into ONE detailed message with all context, because the author must see them together — the fix changes the same lines. Example: a missing `await` and a missing transaction wrapper in the same function.
 
-      Interacting findings: those that overlap or affect the same fix. Bundle into
-      ONE detailed message with all context. Example: a missing `await` and a missing
-      transaction wrapper on the same function — the author needs to see them together
-      because the fix changes both lines.
+**Independent findings** touch separate functions or files and share no fix. Report them sequentially as discrete items, one at a time, so each piece of feedback is actionable on its own.
 
-      Independent findings: separate functions, separate files, no shared fix. Report
-      SEQUENTIALLY as discrete items so each piece of feedback is actionable.
-
-      Give a one-line heuristic for telling them apart (e.g. "if fixing A changes the
-      code B references, they are interacting").
--->
+Heuristic: if fixing A changes the code that B references, they are interacting; otherwise they are independent.
 
 ## Phase 4 — Output format
 
@@ -91,23 +72,71 @@ Severity is `bug` | `security` | `convention` | `breaking`. End with a one-line 
 
 ## Examples
 
-<!--
-TODO: Write at least TWO concrete input/output examples using the format above.
+### Example 1 — independent findings
 
-Examples are the difference between a command that produces
-consistent output across team members and one that produces wildly varying output.
+Input:
 
-Example 1 — INDEPENDENT findings. Show a diff with two unrelated convention
-violations on the same file (e.g. a handler returning a `{ status: 404 }` shape
-instead of throwing ApiError, AND a raw SQL call that bypasses the repository
-layer). Report each as a separate `[convention]` finding. End with a verdict.
+```
+/review main...feature/order-lookup
 
-Example 2 — INTERACTING findings. Show a diff where multiple problems share a
-single fix (e.g. a refundOrder handler that has missing awaits AND no transaction
-wrapper AND wrong ordering between paymentService and DB writes). Bundle them
-into ONE `[bug]` finding that lists the three issues together because the fix
-changes the same three lines. End with a verdict.
--->
+--- a/src/api/orders/handler.ts
++++ b/src/api/orders/handler.ts
++export async function getOrder(req) {
++  const order = await orderRepo.findById(req.params.id);
++  if (!order) return { status: 404, body: { error: "not found" } };
++  return { status: 200, body: order };
++}
++
++export async function listRecent(req) {
++  const rows = await pool.query(`SELECT * FROM orders WHERE user_id = ${req.query.userId}`);
++  return { status: 200, body: rows };
++}
+```
+
+Output:
+
+```
+[convention] src/api/orders/handler.ts:3
+finding: getOrder returns a `{ status: 404 }` body instead of throwing ApiError.
+fix: Replace with `throw new ApiError(404, "order_not_found", "Order not found")`.
+
+[convention] src/api/orders/handler.ts:8
+finding: listRecent calls pool.query directly, bypassing the repository layer (and interpolating user input into SQL).
+fix: Add a typed `listRecentByUser` function in src/db/orders.ts using parameterized queries and call that.
+
+verdict: request-changes
+```
+
+The two findings are in separate functions with no shared fix, so they are reported separately.
+
+### Example 2 — interacting findings
+
+Input:
+
+```
+/review 482
+
+--- a/src/api/orders/refund.ts
++++ b/src/api/orders/refund.ts
++export async function refundOrder(req) {
++  const order = orderRepo.findById(req.params.id);
++  paymentService.refund(order.paymentId, order.total);
++  pool.query("UPDATE orders SET status = 'refunded' WHERE id = $1", [order.id]);
++  return { status: 200, body: { id: order.id } };
++}
+```
+
+Output:
+
+```
+[bug] src/api/orders/refund.ts:2-5
+finding: Three linked problems in refundOrder: (1) `findById`, `paymentService.refund`, and the status update are all missing `await`, so `order` is a Promise and errors are swallowed; (2) the DB update is not wrapped in `withTransaction`; (3) the payment is refunded before the DB write, so a DB failure leaves money refunded with the order still marked paid.
+fix: Rewrite as `await withTransaction(async (tx) => { const order = await orderRepo.findById(id, tx); await orderRepo.markRefunded(order.id, tx); await paymentService.refund(order.paymentId, order.total); })` — awaiting everything, inside one transaction, with the DB write first so the payment call failing rolls it back.
+
+verdict: request-changes
+```
+
+These are bundled into one finding because the fix changes the same lines.
 
 ## Notes
 
