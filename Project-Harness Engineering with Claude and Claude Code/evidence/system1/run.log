@@ -1,0 +1,19 @@
+run_dir: /mnt/c/Users/pal.kecskemeti/IdeaProjects/cd15315-Claude-AI-Engineer-Harness-Engineering/Build a Claims Intake Agent with a stop_reason-Driven Loop/exercises/03-dynamic-decomposition/solution/runs/20261120_083822
+[claim_01_kitchen_fire] policy=POL-1001 expected=routed
+  → outcome=escalated turns=2 clarifications=0 tokens=6266/414 est=$0.0083
+[claim_02_stolen_bike] policy=POL-1007 expected=routed
+  → outcome=escalated turns=2 clarifications=0 tokens=6164/385 est=$0.0081
+[claim_03_water_damage] policy=POL-1004 expected=routed
+  → outcome=escalated turns=5 clarifications=1 tokens=16453/681 est=$0.0199
+[claim_04_neighbor_injury] policy=POL-1002 expected=routed
+  → outcome=routed turns=5 clarifications=0 tokens=17465/879 est=$0.0219
+[claim_05_auto_collision] policy=POL-1003 expected=routed
+  → outcome=routed turns=5 clarifications=0 tokens=18256/1035 est=$0.0234
+[claim_06_low_confidence_escalation] policy=POL-1008 expected=escalated
+  → outcome=escalated turns=2 clarifications=0 tokens=6282/523 est=$0.0089
+[claim_07_tree_falls_on_car] policy=POL-1005 expected=routed
+  → outcome=escalated turns=2 clarifications=0 tokens=6303/491 est=$0.0088
+[claim_08_minor_porch_damage] policy=POL-1006 expected=routed
+  → outcome=routed turns=5 clarifications=0 tokens=17187/833 est=$0.0214
+summary: /mnt/c/Users/pal.kecskemeti/IdeaProjects/cd15315-Claude-AI-Engineer-Harness-Engineering/Build a Claims Intake Agent with a stop_reason-Driven Loop/exercises/03-dynamic-decomposition/solution/runs/20261120_083822/summary.md
+total estimated cost: $0.1206

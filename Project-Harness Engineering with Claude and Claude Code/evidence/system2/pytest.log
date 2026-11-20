@@ -1,7 +1,7 @@
-============================= test session starts =============================
-platform win32 -- Python 3.14.5, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\pal.kecskemeti\AppData\Local\Temp\claude\d3a32321c740caef\c1d36de2-02c3-4232-9112-03085e828b01\scratchpad\v2\Scripts\python.exe
+============================= test session starts ==============================
+platform linux -- Python 3.13.5, pytest-9.2.0, pluggy-1.7.0 -- /mnt/c/Users/pal.kecskemeti/IdeaProjects/cd15315-Claude-AI-Engineer-Harness-Engineering/Engineer a Long-Conversation Context Strategy for a Retail Support Copilot/01-prune-tool-output/starter/.venv/bin/python3.13
 cachedir: .pytest_cache
-rootdir: C:\Users\pal.kecskemeti\IdeaProjects\cd15315-Claude-AI-Engineer-Harness-Engineering\Engineer a Long-Conversation Context Strategy for a Retail Support Copilot\04-assemble-and-locate\solution
+rootdir: /mnt/c/Users/pal.kecskemeti/IdeaProjects/cd15315-Claude-AI-Engineer-Harness-Engineering/Engineer a Long-Conversation Context Strategy for a Retail Support Copilot/04-assemble-and-locate/solution
 configfile: pyproject.toml
 plugins: anyio-4.16.0
 collecting ... collected 30 items
@@ -37,4 +37,4 @@ tests/test_transcript.py::test_transcript_loader_token_count_in_engineered_range
 tests/test_transcript.py::test_active_turns_accessor PASSED              [ 96%]
 tests/test_transcript.py::test_canonical_token_function_is_used_everywhere PASSED [100%]
 
-======================== 28 passed, 2 skipped in 2.06s ========================
+======================== 28 passed, 2 skipped in 30.40s ========================
